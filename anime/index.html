@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Anime Watch Sync</title>
+    <style>
+        :root {
+            --bg: #1e1e2e;
+            --panel: #27273a;
+            --accent: #89b4fa;
+            --text: #cdd6f4;
+            --subtext: #a6adc8;
+            --border: #313244;
+            --watched: #a6e3a1;
+            --danger: #f38ba8;
+        }
+        body, html { margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; height: 100%; }
+        * { box-sizing: border-box; }
+        
+        /* Auth Screen */
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .auth-box { background: var(--panel); padding: 30px; border-radius: 16px; border: 1px solid var(--border); width: 100%; max-width: 400px; text-align: center; }
+        .auth-box h2 { margin-top: 0; color: var(--accent); }
+        .auth-box input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; }
+        .auth-box button { width: 100%; padding: 12px; margin-top: 15px; border-radius: 8px; border: none; background: var(--accent); color: #111; font-weight: bold; cursor: pointer; font-size: 16px; }
+        
+        /* Navigation */
+        nav { display: flex; gap: 10px; padding: 15px; background: rgba(30,30,46,0.9); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+        nav::-webkit-scrollbar { display: none; }
+        .tab { padding: 8px 16px; border-radius: 20px; background: var(--panel); color: var(--subtext); cursor: pointer; white-space: nowrap; transition: 0.2s; border: 1px solid transparent; font-weight: 500; font-size: 14px; }
+        .tab.active { background: rgba(137, 180, 250, 0.1); color: var(--accent); border-color: var(--accent); }
+        
+        main { padding: 15px; padding-bottom: 50px; }
+        
+        /* Search */
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
+        .search-box input { flex: 1; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 16px; outline: none; transition: border 0.2s; }
+        .search-box input:focus { border-color: var(--accent); }
+        .search-box button { padding: 14px 20px; border-radius: 12px; border: none; background: var(--accent); color: #111; font-weight: bold; cursor: pointer; font-size: 16px; }
+        
+        /* Grid Layout */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+        @media (min-width: 500px) { .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; } }
+        
+        .card { background: var(--panel); border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.2s; border: 1px solid var(--border); display: flex; flex-direction: column; position: relative; }
+        .card:active { transform: scale(0.96); }
+        .card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; background: #111; }
+        .card .info { padding: 10px; flex: 1; display: flex; flex-direction: column; }
+        .card .title { font-size: 13px; font-weight: 600; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
+        .card .year { font-size: 12px; color: var(--subtext); }
+        .card .badge { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); padding: 4px 8px; border-radius: 8px; font-size: 10px; font-weight: bold; color: var(--accent); border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* Modal */
+        #modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 100; display: none; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+        #modal.active { display: flex; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .modal-header { position: sticky; top: 0; padding: 15px; background: rgba(30,30,46,0.95); backdrop-filter: blur(10px); display: flex; gap: 15px; align-items: center; z-index: 10; border-bottom: 1px solid var(--border); }
+        .back-btn { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 8px 15px; border-radius: 8px; font-size: 15px; cursor: pointer; font-weight: bold; }
+        .back-btn:active { background: rgba(255,255,255,0.1); }
+        
+        .modal-content { padding: 15px; }
+        .hero { display: flex; gap: 15px; margin-bottom: 20px; }
+        .hero img { width: 100px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); }
+        @media (min-width: 500px) { .hero img { width: 140px; } }
+        .hero-info { flex: 1; }
+        .hero h2 { margin: 0 0 8px 0; font-size: 18px; line-height: 1.2; }
+        .desc { font-size: 13px; color: var(--subtext); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 10px; }
+        
+        select { width: 100%; padding: 14px; border-radius: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); font-size: 15px; margin-bottom: 15px; outline: none; appearance: none; }
+        
+        .status-actions { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .status-btn { flex: 1; min-width: 90px; padding: 10px 5px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--text); text-align: center; cursor: pointer; font-size: 13px; font-weight: 500; transition: 0.2s; }
+        .status-btn.active { background: rgba(137, 180, 250, 0.15); border-color: var(--accent); color: var(--accent); }
+        .status-btn:active { transform: scale(0.95); }
+        
+        .ep-list { display: flex; flex-direction: column; gap: 8px; }
+        .ep-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 15px; background: var(--panel); border-radius: 12px; border: 1px solid var(--border); cursor: pointer; transition: background 0.2s; }
+        .ep-item:active { background: rgba(255,255,255,0.05); }
+        .ep-item.watched { border-color: var(--watched); background: rgba(166, 227, 161, 0.05); }
+        .ep-item .time { font-size: 12px; color: var(--accent); opacity: 0.8; }
+        .ep-item .mark-btn { padding: 6px 12px; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; cursor: pointer; }
+        .ep-item.watched .mark-btn { background: rgba(166, 227, 161, 0.2); border-color: var(--watched); color: var(--watched); }
+        
+        /* Player */
+        #player-container { position: sticky; top: 62px; width: 100%; aspect-ratio: 16/9; background: #000; z-index: 5; display: none; border-bottom: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        .loader { text-align: center; padding: 40px; color: var(--subtext); font-size: 14px; }
+        
+        /* Sync indicator */
+        #sync-indicator { position: fixed; bottom: 20px; right: 20px; background: var(--panel); border: 1px solid var(--border); padding: 8px 15px; border-radius: 20px; font-size: 12px; color: var(--text); display: none; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+
+<div id="auth-screen" style="display: none;">
+    <div class="auth-box">
+        <h2>Настройка Sync</h2>
+        <p style="font-size: 13px; color: var(--subtext); margin-bottom: 20px;">Введите ваши токены. Они сохранятся только на этом устройстве.</p>
+        <input type="password" id="input-github" placeholder="GitHub Token (ghp_...)">
+        <input type="password" id="input-kodik" placeholder="Kodik Token">
+        <button onclick="saveAuth()">Сохранить и войти</button>
+    </div>
+</div>
+
+<nav>
+    <div class="tab active" onclick="switchTab('search')">🔍 Поиск</div>
+    <div class="tab" onclick="switchTab('watching')">📺 Смотрю</div>
+    <div class="tab" onclick="switchTab('planned')">📅 В планах</div>
+    <div class="tab" onclick="switchTab('on_hold')">⏸ Отложено</div>
+    <div class="tab" onclick="switchTab('completed')">✅ Просмотрено</div>
+    <div class="tab" onclick="switchTab('dropped')">🗑 Брошено</div>
+    <div class="tab" onclick="logout()" style="margin-left:auto; color:var(--danger);">Выйти</div>
+</nav>
+
+<main>
+    <div id="tab-search">
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Название аниме..." onkeydown="if(event.key === 'Enter') doSearch()">
+            <button onclick="doSearch()">Искать</button>
+        </div>
+        <div id="search-results" class="grid"></div>
+    </div>
+    <div id="tab-list" style="display:none;">
+        <div id="list-results" class="grid"></div>
+    </div>
+</main>
+
+<div id="modal">
+    <div class="modal-header">
+        <button class="back-btn" onclick="closeModal()">❮ Назад</button>
+        <span style="font-weight: 600; font-size: 15px; flex:1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="modal-title-top"></span>
+        <div style="width: 70px;"></div>
+    </div>
+    
+    <div id="player-container">
+        <iframe id="video-player" allowfullscreen allow="autoplay *; fullscreen *"></iframe>
+    </div>
+    
+    <div class="modal-content">
+        <div class="hero">
+            <img id="m-cover" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=">
+            <div class="hero-info">
+                <h2 id="m-title"></h2>
+                <div class="desc" id="m-desc">Загрузка информации...</div>
+            </div>
+        </div>
+        
+        <div class="status-actions" id="m-statuses">
+            <div class="status-btn" onclick="setStatus('watching')">Смотрю</div>
+            <div class="status-btn" onclick="setStatus('planned')">В планах</div>
+            <div class="status-btn" onclick="setStatus('completed')">Просмотрено</div>
+            <div class="status-btn" onclick="setStatus('on_hold')">Отложено</div>
+            <div class="status-btn" onclick="setStatus('dropped')">Брошено</div>
+            <div class="status-btn" style="color:var(--danger); border-color:var(--danger);" onclick="setStatus('')">Удалить</div>
+        </div>
+        
+        <select id="m-trans" onchange="renderEpisodes()"></select>
+        
+        <div class="ep-list" id="m-eps"></div>
+    </div>
+</div>
+
+<div id="sync-indicator">Синхронизация...</div>
+
+<script>
+    // Config & Auth
+    let GITHUB_TOKEN = localStorage.getItem('GITHUB_TOKEN');
+    let KODIK_TOKEN = localStorage.getItem('KODIK_TOKEN');
+    let GIST_ID = localStorage.getItem('GIST_ID');
+    
+    if (!GITHUB_TOKEN || !KODIK_TOKEN) {
+        document.getElementById('auth-screen').style.display = 'flex';
+    } else {
+        initApp();
+    }
+
+    function saveAuth() {
+        let gh = document.getElementById('input-github').value.trim();
+        let kd = document.getElementById('input-kodik').value.trim();
+        if(gh && kd) {
+            localStorage.setItem('GITHUB_TOKEN', gh);
+            localStorage.setItem('KODIK_TOKEN', kd);
+            GITHUB_TOKEN = gh;
+            KODIK_TOKEN = kd;
+            document.getElementById('auth-screen').style.display = 'none';
+            initApp();
+        } else {
+            alert('Введите оба токена!');
+        }
+    }
+
+    function logout() {
+        localStorage.clear();
+        location.reload();
+    }
+
+    // State
+    let listsData = JSON.parse(localStorage.getItem('listsData') || '{}');
+    let statusData = JSON.parse(localStorage.getItem('statusData') || '{}');
+    let syncTimer = null;
+    let pollerInterval = null;
+
+    let currentAnime = null;
+    let currentResults = null;
+    let currentPlayingEp = null;
+
+    const CAT_LABELS = { "watching": "Смотрю", "planned": "В планах", "on_hold": "Отложено", "dropped": "Брошено", "completed": "Просмотрено" };
+
+    function saveLocally() {
+        localStorage.setItem('listsData', JSON.stringify(listsData));
+        localStorage.setItem('statusData', JSON.stringify(statusData));
+    }
+
+    function showSync(text) {
+        let el = document.getElementById('sync-indicator');
+        el.textContent = text;
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 2000);
+    }
+
+    async function pushToGist() {
+        if (syncTimer) clearTimeout(syncTimer);
+        syncTimer = setTimeout(async () => {
+            syncTimer = null;
+            showSync('Выгрузка в облако...');
+            try {
+                if (!GIST_ID) {
+                    let r = await fetch('https://api.github.com/gists', { headers: { Authorization: 'token ' + GITHUB_TOKEN }});
+                    let gists = await r.json();
+                    let g = gists.find(x => x.description === "Anime Watch Sync");
+                    if (g) { GIST_ID = g.id; localStorage.setItem('GIST_ID', GIST_ID); }
+                    else {
+                        let res = await fetch('https://api.github.com/gists', {
+                            method: 'POST',
+                            headers: { Authorization: 'token ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                description: "Anime Watch Sync", public: false,
+                                files: {
+                                    ".anime_watch_status.json": { content: JSON.stringify(statusData, null, 2) },
+                                    ".anime_lists.json": { content: JSON.stringify(listsData, null, 2) }
+                                }
+                            })
+                        });
+                        let created = await res.json();
+                        GIST_ID = created.id;
+                        localStorage.setItem('GIST_ID', GIST_ID);
+                        showSync('✅ Создан Gist');
+                        return;
+                    }
+                }
+                
+                let res = await fetch('https://api.github.com/gists/' + GIST_ID, {
+                    method: 'PATCH',
+                    headers: { Authorization: 'token ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        files: {
+                            ".anime_watch_status.json": { content: JSON.stringify(statusData, null, 2) },
+                            ".anime_lists.json": { content: JSON.stringify(listsData, null, 2) }
+                        }
+                    })
+                });
+                if(res.ok) showSync('✅ Облако обновлено');
+            } catch(e) {
+                console.error("Sync error:", e);
+                showSync('❌ Ошибка сети');
+            }
+        }, 3000);
+    }
+
+    async function pullFromGist() {
+        if (syncTimer) return; // wait for pending push
+        try {
+            if (!GIST_ID) {
+                let r = await fetch('https://api.github.com/gists', { headers: { Authorization: 'token ' + GITHUB_TOKEN }});
+                let gists = await r.json();
+                let g = gists.find(x => x.description === "Anime Watch Sync");
+                if (g) { GIST_ID = g.id; localStorage.setItem('GIST_ID', GIST_ID); }
+                else return; 
+            }
+            let r = await fetch('https://api.github.com/gists/' + GIST_ID, { headers: { Authorization: 'token ' + GITHUB_TOKEN }});
+            if(!r.ok) return;
+            let data = await r.json();
+            let files = data.files || {};
+            let changed = false;
+
+            if (files[".anime_watch_status.json"]) {
+                let rem_st = JSON.parse(files[".anime_watch_status.json"].content || '{}');
+                let merged = { ...statusData };
+                for (let k in rem_st) {
+                    let v = rem_st[k];
+                    if (!(k in merged)) { merged[k] = v; changed = true; }
+                    else {
+                        let lv = merged[k];
+                        let lv_w = typeof lv === 'object' ? (lv.watched||false) : lv;
+                        let v_w = typeof v === 'object' ? (v.watched||false) : v;
+                        let lv_t = typeof lv === 'object' ? (lv.time||0) : 0;
+                        let v_t = typeof v === 'object' ? (v.time||0) : 0;
+                        if(lv_w !== (lv_w||v_w) || lv_t !== Math.max(lv_t, v_t)) changed = true;
+                        merged[k] = { watched: lv_w || v_w, time: Math.max(lv_t, v_t) };
+                    }
+                }
+                statusData = merged;
+            }
+
+            if (files[".anime_lists.json"]) {
+                let rem_l = JSON.parse(files[".anime_lists.json"].content || '{}');
+                if (JSON.stringify(rem_l) !== JSON.stringify(listsData)) {
+                    listsData = { ...listsData, ...rem_l };
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                saveLocally();
+                refreshUI();
+                showSync('✅ Данные получены');
+            }
+        } catch(e) {
+            console.error("Pull error:", e);
+        }
+    }
+
+    function initApp() {
+        pullFromGist();
+        pollerInterval = setInterval(pullFromGist, 15000);
+        
+        // Listen to Kodik player messages
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.key === 'kodik_player_time_update') {
+                let time = event.data.value; // current time in seconds
+                if (time > 0 && currentAnime && currentPlayingEp !== null) {
+                    let stKey = `${currentAnime.shiki_id}_${currentAnime.trans_id}_${currentPlayingEp}`;
+                    let st = statusData[stKey] || {};
+                    let w = typeof st === 'boolean' ? st : (st.watched || false);
+                    statusData[stKey] = { watched: w, time: Math.floor(time) };
+                    saveLocally();
+                    pushToGist();
+                }
+            }
+        });
+    }
+
+    function refreshUI() {
+        if(document.getElementById('modal').classList.contains('active')) {
+            updateStatusButtons();
+            renderEpisodes();
+        }
+        let activeTab = document.querySelector('.tab.active').getAttribute('onclick');
+        if (activeTab && activeTab.includes("switchTab('") && !activeTab.includes("search")) {
+            let cat = activeTab.match(/'([^']+)'/)[1];
+            renderList(cat);
+        }
+    }
+
+    // UI Logic
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+        
+        if (tab === 'search') {
+            document.getElementById('tab-search').style.display = 'block';
+            document.getElementById('tab-list').style.display = 'none';
+        } else {
+            document.getElementById('tab-search').style.display = 'none';
+            document.getElementById('tab-list').style.display = 'block';
+            renderList(tab);
+        }
+    }
+
+    function renderList(cat) {
+        let container = document.getElementById('list-results');
+        let items = Object.values(listsData).filter(v => v.status === cat);
+        
+        if (!items.length) {
+            container.innerHTML = '<div class="loader">В этом списке пока пусто.</div>';
+            return;
+        }
+        
+        let html = '';
+        for (let item of items) {
+            html += `
+                <div class="card" onclick="openAnime(${item.shiki_id}, '${item.title.replace(/'/g, "\\'")}', '${item.trans_id || ''}')">
+                    <img src="https://shikimori.one/system/animes/original/${item.shiki_id}.jpg" onerror="this.src='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='">
+                    <div class="info"><div class="title">${item.title}</div></div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    async function doSearch() {
+        let q = document.getElementById('search-input').value.trim();
+        if (!q) return;
+        
+        let container = document.getElementById('search-results');
+        container.innerHTML = '<div class="loader">Ищем на Kodik...</div>';
+        
+        try {
+            let res = await fetch(`https://kodik-api.com/search?token=${KODIK_TOKEN}&title=${encodeURIComponent(q)}&with_episodes=true&with_seasons=true`);
+            let data = await res.json();
+            
+            if (!data.results || !data.results.length) {
+                container.innerHTML = '<div class="loader">Ничего не найдено</div>';
+                return;
+            }
+            
+            let groups = {};
+            for (let r of data.results) {
+                if (!r.shikimori_id) continue;
+                if (!groups[r.shikimori_id]) groups[r.shikimori_id] = { title: r.title, year: r.year, items: [] };
+                groups[r.shikimori_id].items.push(r);
+            }
+            
+            let html = '';
+            for (let sid in groups) {
+                let g = groups[sid];
+                let badge = listsData[sid] ? `<div class="badge">${CAT_LABELS[listsData[sid].status] || listsData[sid].status}</div>` : '';
+                html += `
+                    <div class="card" onclick="openAnimeData(${sid}, '${g.title.replace(/'/g, "\\'")}', '${encodeURIComponent(JSON.stringify(g.items))}')">
+                        ${badge}
+                        <img src="https://shikimori.one/system/animes/original/${sid}.jpg" onerror="this.src='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='">
+                        <div class="info">
+                            <div class="title">${g.title}</div>
+                            <div class="year">${g.year || '?'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        } catch(e) {
+            container.innerHTML = '<div class="loader">Ошибка сети</div>';
+        }
+    }
+
+    async function openAnime(shiki_id, title, preferred_trans_id) {
+        document.getElementById('modal').classList.add('active');
+        document.getElementById('modal-title-top').textContent = title;
+        document.getElementById('m-title').textContent = title;
+        document.getElementById('m-desc').textContent = "Ищем серии на Kodik...";
+        document.getElementById('m-cover').src = `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
+        document.getElementById('m-eps').innerHTML = '<div class="loader">Загрузка серий...</div>';
+        document.getElementById('m-trans').innerHTML = '';
+        
+        try {
+            let res = await fetch(`https://kodik-api.com/search?token=${KODIK_TOKEN}&shikimori_id=${shiki_id}&with_episodes=true&with_seasons=true`);
+            let data = await res.json();
+            let items = data.results || [];
+            if(!items.length) {
+                document.getElementById('m-desc').textContent = "Не удалось загрузить серии с Kodik.";
+                document.getElementById('m-eps').innerHTML = '';
+                return;
+            }
+            openAnimeData(shiki_id, title, encodeURIComponent(JSON.stringify(items)), preferred_trans_id);
+        } catch(e) {
+            document.getElementById('m-desc').textContent = "Ошибка сети.";
+        }
+    }
+
+    function openAnimeData(shiki_id, title, itemsJsonUrl, preferred_trans_id) {
+        currentAnime = { shiki_id, title };
+        currentResults = JSON.parse(decodeURIComponent(itemsJsonUrl));
+        
+        document.getElementById('m-title').textContent = title;
+        document.getElementById('modal-title-top').textContent = title;
+        document.getElementById('m-desc').textContent = "Загрузка...";
+        document.getElementById('m-cover').src = `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
+        
+        document.getElementById('modal').classList.add('active');
+        stopPlayer();
+        
+        fetch(`https://shikimori.one/api/animes/${shiki_id}`)
+            .then(r => r.json())
+            .then(shiki => {
+                if (shiki && shiki.description) document.getElementById('m-desc').textContent = shiki.description.replace(/\[.*?\]/g, '');
+                else document.getElementById('m-desc').textContent = "Описание отсутствует.";
+            }).catch(()=> document.getElementById('m-desc').textContent = "Описание отсутствует.");
+        
+        updateStatusButtons();
+        
+        let transSelect = document.getElementById('m-trans');
+        transSelect.innerHTML = '';
+        
+        let transGroups = {};
+        for (let r of currentResults) {
+            let t = r.translation ? r.translation.title : "Оригинал";
+            transGroups[t] = r;
+        }
+        
+        let selectedIdx = 0;
+        Object.keys(transGroups).forEach((t, i) => {
+            let opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            transSelect.appendChild(opt);
+            
+            let tid = transGroups[t].translation ? transGroups[t].translation.id : null;
+            if (preferred_trans_id && String(tid) === String(preferred_trans_id)) selectedIdx = i;
+        });
+        
+        transSelect.selectedIndex = selectedIdx;
+        renderEpisodes();
+    }
+
+    function updateStatusButtons() {
+        let savedStatus = listsData[currentAnime.shiki_id] ? listsData[currentAnime.shiki_id].status : null;
+        document.querySelectorAll('.status-btn').forEach(btn => btn.classList.remove('active'));
+        if (savedStatus) {
+            let btn = document.querySelector(`.status-btn[onclick="setStatus('${savedStatus}')"]`);
+            if (btn) btn.classList.add('active');
+        }
+    }
+
+    function setStatus(status) {
+        let transSelect = document.getElementById('m-trans');
+        let selectedT = transSelect.value;
+        let transData = currentResults.find(r => (r.translation ? r.translation.title : "Оригинал") === selectedT);
+        let trans_id = transData.translation ? transData.translation.id : null;
+        
+        if (status === '') {
+            delete listsData[currentAnime.shiki_id];
+        } else {
+            listsData[currentAnime.shiki_id] = {status: status, title: currentAnime.title, trans_id: trans_id, shiki_id: currentAnime.shiki_id, trans_title: selectedT};
+        }
+        saveLocally();
+        pushToGist();
+        updateStatusButtons();
+        refreshUI();
+    }
+
+    function renderEpisodes() {
+        let transSelect = document.getElementById('m-trans');
+        let selectedT = transSelect.value;
+        let transData = currentResults.find(r => (r.translation ? r.translation.title : "Оригинал") === selectedT);
+        
+        let epMap = {}; // "Сезон X Серия Y" -> { ep_num, link }
+        if (transData.seasons) {
+            for (let s in transData.seasons) {
+                for (let e in transData.seasons[s].episodes) {
+                    epMap[`Сезон ${s} Серия ${e}`] = { num: parseInt(e), link: transData.seasons[s].episodes[e] };
+                }
+            }
+        }
+        if (Object.keys(epMap).length === 0) epMap["Фильм"] = { num: 0, link: transData.link };
+        
+        let sortedKeys = Object.keys(epMap).sort((a,b) => {
+            let na = a.match(/\d+/g) || [0];
+            let nb = b.match(/\d+/g) || [0];
+            for(let i=0; i<na.length; i++) {
+                if (parseInt(na[i]) !== parseInt(nb[i])) return parseInt(na[i]) - parseInt(nb[i]);
+            }
+            return 0;
+        });
+        
+        let trans_id = transData.translation ? transData.translation.id : null;
+        currentAnime.trans_id = trans_id;
+        
+        let container = document.getElementById('m-eps');
+        let html = '';
+        for (let k of sortedKeys) {
+            let epInfo = epMap[k];
+            let stKey = `${currentAnime.shiki_id}_${trans_id}_${epInfo.num}`;
+            let st = statusData[stKey] || {};
+            let watched = typeof st === 'boolean' ? st : (st.watched || false);
+            let time = typeof st === 'boolean' ? 0 : (st.time || 0);
+            
+            let tStr = '';
+            if (time > 0) {
+                let m = Math.floor(time/60);
+                let s = time%60;
+                tStr = `${m}:${s.toString().padStart(2,'0')}`;
+            }
+            
+            html += `
+                <div class="ep-item ${watched ? 'watched' : ''}" onclick="playEp(${epInfo.num}, '${epInfo.link}', ${time})">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="width:20px; font-weight:bold;">${watched ? '✓' : ''}</span>
+                        <span>${k}</span>
+                        <span class="time">${tStr}</span>
+                    </div>
+                    <button class="mark-btn" onclick="event.stopPropagation(); toggleWatched(${epInfo.num})">${watched ? 'Снять' : 'Отметить'}</button>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    function toggleWatched(ep_num) {
+        let stKey = `${currentAnime.shiki_id}_${currentAnime.trans_id}_${ep_num}`;
+        let st = statusData[stKey] || {};
+        let w = typeof st === 'boolean' ? st : (st.watched || false);
+        let t = typeof st === 'boolean' ? 0 : (st.time || 0);
+        statusData[stKey] = { watched: !w, time: t };
+        
+        saveLocally();
+        pushToGist();
+        renderEpisodes();
+    }
+
+    function playEp(ep_num, link, startTime) {
+        let pCont = document.getElementById('player-container');
+        pCont.style.display = 'block';
+        
+        let v = document.getElementById('video-player');
+        
+        // Form the proper Kodik player link. Must be https:
+        let url = link;
+        if(url.startsWith('//')) url = 'https:' + url;
+        
+        // Pass startTime to the player. Kodik supports ?time=XXX parameter!
+        if (startTime > 0) {
+            url += (url.includes('?') ? '&' : '?') + 'time=' + startTime;
+        }
+        
+        // Enable api so we receive postMessage events
+        // ?api=1 or similar? Actually Kodik always sends 'kodik_player_time_update' messages to parent
+        v.src = url;
+        currentPlayingEp = ep_num;
+        
+        setTimeout(() => {
+            pCont.scrollIntoView({behavior: "smooth", block: "start"});
+        }, 300);
+    }
+
+    function stopPlayer() {
+        let v = document.getElementById('video-player');
+        if (v && currentPlayingEp !== null) {
+            v.src = "";
+        }
+        document.getElementById('player-container').style.display = 'none';
+        currentPlayingEp = null;
+    }
+
+    function closeModal() {
+        stopPlayer();
+        document.getElementById('modal').classList.remove('active');
+        refreshUI();
+    }
+
+</script>
+</body>
+</html>
