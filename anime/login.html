@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Вход - Anime Watch Sync</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: rgba(30, 41, 59, 0.7);
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --text: #f8fafc;
+            --subtext: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        /* Gradient Background Animation */
+        .bg-blob {
+            position: absolute; width: 300px; height: 300px;
+            background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+            border-radius: 50%; filter: blur(80px); opacity: 0.5;
+            animation: move 10s infinite alternate;
+            z-index: -1;
+        }
+        @keyframes move {
+            0% { transform: translate(-100px, -100px) scale(1); }
+            100% { transform: translate(100px, 100px) scale(1.2); }
+        }
+        
+        .auth-card {
+            background: var(--panel);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 40px 30px;
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            width: 90%; max-width: 360px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        .auth-card h2 { margin: 0 0 10px; font-size: 28px; font-weight: 700; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; color: transparent; }
+        .auth-card p { color: var(--subtext); font-size: 14px; margin-bottom: 30px; }
+        
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .input-group input {
+            width: 100%; padding: 14px 16px; border-radius: 12px;
+            border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+            color: var(--text); font-size: 15px; outline: none; transition: 0.3s;
+            box-sizing: border-box;
+        }
+        .input-group input:focus { border-color: var(--accent); background: rgba(0,0,0,0.4); }
+        
+        button {
+            width: 100%; padding: 14px; border-radius: 12px; border: none;
+            background: var(--accent); color: #fff; font-weight: 600; font-size: 16px;
+            cursor: pointer; transition: 0.3s; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+            margin-top: 10px;
+        }
+        button:hover { background: var(--accent-hover); transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+        
+        #error-msg { color: #f87171; font-size: 13px; margin-top: 15px; display: none; }
+        
+        .api-config {
+            margin-top: 20px; font-size: 12px; color: var(--subtext); cursor: pointer; text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-blob"></div>
+    <div class="auth-card">
+        <h2>Anime Sync</h2>
+        <p>Войдите для синхронизации списков</p>
+        <div class="input-group">
+            <input type="text" id="username" placeholder="Логин" autocomplete="username">
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" placeholder="Пароль" autocomplete="current-password">
+        </div>
+        <button onclick="login()">Войти</button>
+        <div id="error-msg">Неверный логин или пароль</div>
+        
+        <div class="api-config" onclick="configureAPI()">Настроить API URL</div>
+    </div>
+
+    <script>
+        function getAPI() {
+            let api = localStorage.getItem('API_URL');
+            if (!api) {
+                api = prompt("Укажите URL вашего API-сервера (например, https://my-api.onrender.com):");
+                if (api) localStorage.setItem('API_URL', api.replace(/\/$/, ''));
+            }
+            return api;
+        }
+
+        function configureAPI() {
+            let current = localStorage.getItem('API_URL') || '';
+            let api = prompt("Укажите URL вашего API-сервера:", current);
+            if (api) localStorage.setItem('API_URL', api.replace(/\/$/, ''));
+        }
+
+        async function login() {
+            let u = document.getElementById('username').value.trim();
+            let p = document.getElementById('password').value.trim();
+            let err = document.getElementById('error-msg');
+            
+            if (!u || !p) { err.textContent = "Заполните все поля"; err.style.display = 'block'; return; }
+            
+            let api = getAPI();
+            if (!api) return;
+
+            let btn = document.querySelector('button');
+            btn.textContent = "Вход..."; btn.disabled = true;
+
+            try {
+                let res = await fetch(`${api}/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u, password: p})
+                });
+                
+                if (res.ok) {
+                    let data = await res.json();
+                    localStorage.setItem('AUTH_TOKEN', data.access_token);
+                    window.location.href = 'index.html';
+                } else {
+                    err.textContent = "Неверный логин или пароль";
+                    err.style.display = 'block';
+                }
+            } catch (e) {
+                err.textContent = "Ошибка сети или API недоступен";
+                err.style.display = 'block';
+            }
+            
+            btn.textContent = "Войти"; btn.disabled = false;
+        }
+    </script>
+</body>
+</html>
