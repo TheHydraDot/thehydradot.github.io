@@ -399,7 +399,7 @@
         container.innerHTML = '<div class="loader">Ищем на Kodik...</div>';
         
         try {
-            let res = await fetch(`https://kodik-api.com/search?token=${KODIK_TOKEN}&title=${encodeURIComponent(q)}&with_episodes=true&with_seasons=true&limit=100`);
+            let res = await fetch(`https://kodik-api.com/search?token=${KODIK_TOKEN}&title=${encodeURIComponent(q)}&with_episodes=true&with_seasons=true`);
             let data = await res.json();
             
             if (!data.results || !data.results.length) {
@@ -445,7 +445,7 @@
         document.getElementById('m-trans').innerHTML = '';
         
         try {
-            let res = await fetch(`https://kodik-api.com/search?token=${KODIK_TOKEN}&shikimori_id=${shiki_id}&with_episodes=true&with_seasons=true&limit=100`);
+            let res = await fetch(`https://kodik-api.com/search?token=${KODIK_TOKEN}&shikimori_id=${shiki_id}&with_episodes=true&with_seasons=true`);
             let data = await res.json();
             let items = data.results || [];
             if(!items.length) {
