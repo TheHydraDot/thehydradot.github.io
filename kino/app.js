@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const featuresSection = document.getElementById('features-section');
 
     
-    const BACKEND_URL = 'kino-backend-6qscy4wcp-hydradot.vercel.app';
+    const BACKEND_URL = 'https://kino-backend-6qscy4wcp-hydradot.vercel.app';
     const KINOBD_API = `${BACKEND_URL}/api`;
 
     // Кнопка «Назад»
