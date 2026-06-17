@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KinoSpace — Фильмы и сериалы онлайн</title>
+    <meta name="description" content="Смотрите фильмы и сериалы онлайн с выбором озвучки">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="background">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="app-container">
+        <header class="header">
+            <h1 class="logo"><i class="fa-solid fa-clapperboard"></i> KinoSpace</h1>
+            <p class="subtitle">Поиск фильмов и сериалов · выбор озвучки · без рекламы</p>
+        </header>
+
+        <section class="search-section">
+            <form id="search-form" class="search-box">
+                <input type="text" id="search-input" placeholder="Название фильма или сериала..." autocomplete="off" required>
+                <button type="submit" class="search-btn"><i class="fa-solid fa-magnifying-glass"></i><span class="btn-text"> Найти</span></button>
+            </form>
+        </section>
+
+        <!-- Результаты поиска -->
+        <section class="results-section" id="results-section" style="display: none;">
+            <h2 class="results-title" id="results-title">Результаты поиска</h2>
+            <div class="results-grid" id="results-grid"></div>
+        </section>
+
+        <!-- Плеер -->
+        <section class="player-section" id="player-section" style="display: none;">
+            <div class="player-wrapper">
+                <div class="player-header">
+                    <button class="back-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i> Назад к результатам</button>
+                    <h2 id="movie-title">Фильм</h2>
+                    <span class="badge"><i class="fa-solid fa-language"></i> Озвучка внутри плеера</span>
+                </div>
+                <div id="player-container"></div>
+                <div class="player-info" id="player-info"></div>
+            </div>
+        </section>
+
+        <!-- Фичи (показываются до поиска) -->
+        <section class="features" id="features-section">
+            <div class="feature-card">
+                <i class="fa-solid fa-language"></i>
+                <h3>Выбор озвучки</h3>
+                <p>Десятки студий дубляжа и субтитров на выбор в каждом фильме.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fa-solid fa-database"></i>
+                <h3>Огромная база</h3>
+                <p>Более миллиона фильмов и сериалов — от классики до новинок.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fa-solid fa-bolt"></i>
+                <h3>Быстрый CDN</h3>
+                <p>Молниеносная загрузка видео через распределённую сеть серверов.</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js?v=2"></script>
+</body>
+</html>
