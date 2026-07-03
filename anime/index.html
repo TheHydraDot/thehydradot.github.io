@@ -241,6 +241,7 @@
     let statusData = {};
     let syncTimer = null;
     let pollerInterval = null;
+    let isDirty = false;  // true when local changes haven't been pushed yet
 
     let currentAnime = null;
     let currentResults = null;
@@ -268,6 +269,8 @@
     }
 
     async function pullData() {
+        // Don't overwrite local changes that haven't been pushed yet
+        if (isDirty || syncTimer) return;
         try {
             let res = await apiFetch('/api/user/data');
             if (res.ok) {
@@ -283,7 +286,8 @@
         } catch(e) { console.error("Pull error", e); }
     }
 
-    async function pushData() {
+    async function pushData(delay = 500) {
+        isDirty = true;
         if (syncTimer) clearTimeout(syncTimer);
         syncTimer = setTimeout(async () => {
             syncTimer = null;
@@ -296,7 +300,8 @@
                 if(res.ok) showSync('✅ Облако обновлено');
                 else showSync('❌ Ошибка синхронизации');
             } catch(e) { showSync('❌ Ошибка сети'); }
-        }, 2000);
+            isDirty = false;
+        }, delay);
     }
 
     function initApp() {
@@ -311,7 +316,7 @@
                     let st = statusData[stKey] || {};
                     let w = typeof st === 'boolean' ? st : (st.watched || false);
                     statusData[stKey] = { watched: w, time: Math.floor(time) };
-                    pushData();
+                    pushData(3000);
                 }
             }
         });
