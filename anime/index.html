@@ -249,19 +249,40 @@
 
     const CAT_LABELS = { "watching": "Смотрю", "planned": "В планах", "on_hold": "Отложено", "dropped": "Брошено", "completed": "Просмотрено" };
 
-    function handleImgFallback(img, id) {
-        let attempt = parseInt(img.dataset.attempt || "0");
-        const urls = [
-            `https://shikimori.one/system/animes/original/${id}.jpg`,
-            `https://shikimori.io/system/animes/original/${id}.jpg`
-        ];
-        attempt++;
-        if (attempt < urls.length) {
-            img.dataset.attempt = attempt;
-            img.src = urls[attempt];
-        } else {
-            img.onerror = null;
+    async function handleImgFallback(img, id) {
+        // Чтобы не уйти в бесконечный цикл, если и эта ссылка сломана
+        if (img.dataset.fetching === "true") return; 
+        img.dataset.fetching = "true";
+    
+        try {
+            // На лету спрашиваем у Шикимори точную ссылку
+            let res = await fetch(`https://shikimori.one/api/animes/${id}`);
+            if (res.ok) {
+                let data = await res.json();
+                if (data.image && data.image.original) {
+                    let imgUrl = data.image.original;
+                    // Шикимори может отдавать как полный URL, так и относительный
+                    let fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://shikimori.one${imgUrl}`;
+                    
+                    img.src = fullUrl; // Ставим картинку
+    
+                    // Если это аниме есть в твоем списке — обновляем базу, 
+                    // чтобы в следующий раз оно грузилось моментально
+                    if (listsData[id] && listsData[id].poster !== fullUrl) {
+                        listsData[id].poster = fullUrl;
+                        pushData(1000); // Тихо сохраняем в облако
+                    }
+                    return;
+                }
+            }
+        } catch(e) {
+            console.error("Не удалось восстановить обложку для", id);
         }
+    
+        // Если Шикимори вообще не отдал картинку (или упал интернет) — 
+        // ставим красивую серую заглушку с текстом, чтобы не было "рваных" иконок
+        img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" style="background:%231e293b"><text x="50%" y="50%" fill="%2394a3b8" font-family="sans-serif" font-size="16" text-anchor="middle" dominant-baseline="middle">Нет обложки</text></svg>';
+        img.onerror = null;
     }
 
     function logout() {
