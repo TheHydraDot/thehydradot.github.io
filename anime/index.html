@@ -25,13 +25,11 @@
         }
         * { box-sizing: border-box; }
         
-        /* Layout */
         .app-container { display: flex; flex-direction: column; height: 100%; padding-bottom: var(--nav-height); }
         @media (min-width: 768px) {
             .app-container { flex-direction: row; padding-bottom: 0; padding-left: 200px; }
         }
 
-        /* Navigation */
         nav { 
             position: fixed; bottom: 0; left: 0; width: 100%; height: var(--nav-height);
             background: var(--panel-glass); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
@@ -58,7 +56,6 @@
         
         main { flex: 1; padding: 20px; overflow-y: auto; }
         
-        /* Search */
         .search-box { display: flex; gap: 10px; margin-bottom: 25px; position: relative; }
         .search-box input { 
             flex: 1; padding: 16px 20px; border-radius: 16px; border: 1px solid var(--border); 
@@ -72,7 +69,6 @@
         }
         .search-box button:active { transform: scale(0.95); }
         
-        /* Grid */
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 16px; }
         @media (min-width: 500px) { .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; } }
         
@@ -93,7 +89,6 @@
             border: 1px solid var(--border);
         }
         
-        /* Modal */
         #modal { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); 
             z-index: 100; display: none; flex-direction: column; overflow-y: auto; overflow-x: hidden;
@@ -110,7 +105,6 @@
             padding: 8px 16px; border-radius: 12px; font-size: 14px; cursor: pointer; font-weight: 600;
         }
         
-        /* Player */
         #player-container { 
             position: sticky; top: 65px; width: 100%; aspect-ratio: 16/9; background: #000; 
             z-index: 5; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -249,39 +243,35 @@
 
     const CAT_LABELS = { "watching": "Смотрю", "planned": "В планах", "on_hold": "Отложено", "dropped": "Брошено", "completed": "Просмотрено" };
 
+    // Умный загрузчик: если у карточки нет правильной ссылки, запрашиваем её с правильным хешем у Shikimori API
     async function handleImgFallback(img, id) {
-        // Чтобы не уйти в бесконечный цикл, если и эта ссылка сломана
-        if (img.dataset.fetching === "true") return; 
+        if (img.dataset.fetching === "true") return;
         img.dataset.fetching = "true";
-    
+
         try {
-            // На лету спрашиваем у Шикимори точную ссылку
-            let res = await fetch(`https://shikimori.one/api/animes/${id}`);
+            let res = await fetch(`https://shikimori.io/api/animes/${id}`);
             if (res.ok) {
                 let data = await res.json();
                 if (data.image && data.image.original) {
                     let imgUrl = data.image.original;
-                    // Шикимори может отдавать как полный URL, так и относительный
-                    let fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://shikimori.one${imgUrl}`;
+                    let fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://shikimori.io${imgUrl}`;
                     
-                    img.src = fullUrl; // Ставим картинку
-    
-                    // Если это аниме есть в твоем списке — обновляем базу, 
-                    // чтобы в следующий раз оно грузилось моментально
-                    if (listsData[id] && listsData[id].poster !== fullUrl) {
+                    img.src = fullUrl;
+
+                    // Обновляем в локальной базе и отправляем в облако
+                    if (listsData[id]) {
                         listsData[id].poster = fullUrl;
-                        pushData(1000); // Тихо сохраняем в облако
+                        pushData(1000);
                     }
                     return;
                 }
             }
         } catch(e) {
-            console.error("Не удалось восстановить обложку для", id);
+            console.error("Ошибка загрузки обложки через API", e);
         }
-    
-        // Если Шикимори вообще не отдал картинку (или упал интернет) — 
-        // ставим красивую серую заглушку с текстом, чтобы не было "рваных" иконок
-        img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" style="background:%231e293b"><text x="50%" y="50%" fill="%2394a3b8" font-family="sans-serif" font-size="16" text-anchor="middle" dominant-baseline="middle">Нет обложки</text></svg>';
+
+        // Заглушка, если совсем ничего не нашлось
+        img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" style="background:%231e293b"><text x="50%" y="50%" fill="%2394a3b8" font-family="sans-serif" font-size="14" text-anchor="middle" dominant-baseline="middle">Нет обложки</text></svg>';
         img.onerror = null;
     }
 
@@ -395,8 +385,8 @@
         
         let html = '';
         for (let item of items) {
-            // Используем сохраненный постер, если есть, иначе фоллбэк
-            let posterSrc = item.poster || `https://shikimori.one/system/animes/original/${item.shiki_id}.jpg`;
+            // Берем сохраненную ссылку с хешем или заставляем загрузить через API
+            let posterSrc = item.poster || '';
             html += `
                 <div class="card" onclick="openAnime(${item.shiki_id}, '${item.title.replace(/'/g, "\\'")}', '${item.trans_id || ''}')">
                     <img src="${posterSrc}" data-attempt="0" onerror="handleImgFallback(this, ${item.shiki_id})" loading="lazy">
@@ -426,7 +416,6 @@
             let groups = {};
             for (let r of data.results) {
                 if (!r.shikimori_id) continue;
-                // Пробуем взять постер из ответа Kodik, если он там есть
                 let posterUrl = (r.material_data && r.material_data.poster_url) ? r.material_data.poster_url : null;
                 
                 if (!groups[r.shikimori_id]) {
@@ -441,7 +430,7 @@
             for (let sid in groups) {
                 let g = groups[sid];
                 let badge = listsData[sid] ? `<div class="badge">${CAT_LABELS[listsData[sid].status] || listsData[sid].status}</div>` : '';
-                let posterSrc = g.poster || (listsData[sid] ? listsData[sid].poster : `https://shikimori.one/system/animes/original/${sid}.jpg`);
+                let posterSrc = g.poster || (listsData[sid] ? listsData[sid].poster : '');
                 
                 html += `
                     <div class="card" onclick="openAnimeData(${sid}, '${g.title.replace(/'/g, "\\'")}', '${encodeURIComponent(JSON.stringify(g.items))}')">
@@ -464,11 +453,11 @@
         document.getElementById('m-title').textContent = title;
         document.getElementById('m-desc').textContent = "Загрузка...";
         
-        let savedPoster = listsData[shiki_id] ? listsData[shiki_id].poster : null;
+        let savedPoster = listsData[shiki_id] ? listsData[shiki_id].poster : '';
         let mCover = document.getElementById('m-cover');
         mCover.dataset.attempt = "0";
         mCover.onerror = function() { handleImgFallback(this, shiki_id); };
-        mCover.src = savedPoster || `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
+        mCover.src = savedPoster;
         
         document.getElementById('m-eps').innerHTML = '<div class="loader">Загрузка серий...</div>';
         document.getElementById('m-trans').innerHTML = '';
@@ -486,7 +475,7 @@
     }
 
     function openAnimeData(shiki_id, title, itemsJsonUrl, preferred_trans_id) {
-        currentAnime = { shiki_id, title, poster: listsData[shiki_id] ? listsData[shiki_id].poster : null };
+        currentAnime = { shiki_id, title, poster: listsData[shiki_id] ? listsData[shiki_id].poster : '' };
         currentResults = JSON.parse(decodeURIComponent(itemsJsonUrl));
         
         document.getElementById('m-title').textContent = title;
@@ -495,22 +484,21 @@
         document.getElementById('modal').classList.add('active');
         stopPlayer();
         
-        // Запрос к API Шикимори для получения описания и ТОЧНОЙ ссылки на обложку
-        fetch(`https://shikimori.one/api/animes/${shiki_id}`)
+        // Запрос к актуальному API Shikimori для получения описания и ссылки с хешем
+        fetch(`https://shikimori.io/api/animes/${shiki_id}`)
             .then(r => r.json())
             .then(shiki => {
                 if (shiki && shiki.description) document.getElementById('m-desc').textContent = shiki.description.replace(/\[.*?\]/g, '');
                 else document.getElementById('m-desc').textContent = "Описание отсутствует.";
                 
-                // Достаем актуальную ссылку на обложку (с хешем)
                 if (shiki && shiki.image && shiki.image.original) {
-                    let imgUrl = `https://shikimori.one${shiki.image.original}`;
-                    document.getElementById('m-cover').src = imgUrl;
-                    currentAnime.poster = imgUrl; // Сохраняем в память, чтобы потом записать в списки
+                    let imgUrl = shiki.image.original;
+                    let fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://shikimori.io${imgUrl}`;
+                    document.getElementById('m-cover').src = fullUrl;
+                    currentAnime.poster = fullUrl;
                     
-                    // Если аниме уже есть в списке, немедленно обновляем обложку в базе
-                    if (listsData[shiki_id] && listsData[shiki_id].poster !== imgUrl) {
-                        listsData[shiki_id].poster = imgUrl;
+                    if (listsData[shiki_id] && listsData[shiki_id].poster !== fullUrl) {
+                        listsData[shiki_id].poster = fullUrl;
                         pushData();
                     }
                 }
@@ -558,7 +546,6 @@
             delete listsData[currentAnime.shiki_id];
             listsData[currentAnime.shiki_id] = {status: ''}; 
         } else {
-            // Сохраняем также постер, чтобы при открытии списка он сразу был с правильным хешем
             listsData[currentAnime.shiki_id] = {
                 status: status, 
                 title: currentAnime.title, 
@@ -674,7 +661,6 @@
         refreshUI();
     }
 
-    // Start
     initApp();
 </script>
 </body>
