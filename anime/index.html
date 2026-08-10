@@ -249,6 +249,26 @@
 
     const CAT_LABELS = { "watching": "Смотрю", "planned": "В планах", "on_hold": "Отложено", "dropped": "Брошено", "completed": "Просмотрено" };
 
+    // Функция перебора доменов и расширений для обложек
+    function handleImgFallback(img, id) {
+        let attempt = parseInt(img.dataset.attempt || "0");
+        const urls = [
+            `https://shikimori.one/system/animes/original/${id}.jpg`,
+            `https://shikimori.one/system/animes/original/${id}.jpeg`,
+            `https://shikimori.one/system/animes/original/${id}.png`,
+            `https://shikimori.io/system/animes/original/${id}.jpg`,
+            `https://shikimori.io/system/animes/original/${id}.jpeg`,
+            `https://shikimori.io/system/animes/original/${id}.png`
+        ];
+        attempt++;
+        if (attempt < urls.length) {
+            img.dataset.attempt = attempt;
+            img.src = urls[attempt];
+        } else {
+            img.onerror = null; // Отключаем, чтобы избежать бесконечного цикла
+        }
+    }
+
     function logout() {
         localStorage.removeItem('AUTH_TOKEN');
         window.location.href = 'login.html';
@@ -269,7 +289,6 @@
     }
 
     async function pullData() {
-        // Don't overwrite local changes that haven't been pushed yet
         if (isDirty || syncTimer) return;
         try {
             let res = await apiFetch('/api/user/data');
@@ -362,7 +381,7 @@
         for (let item of items) {
             html += `
                 <div class="card" onclick="openAnime(${item.shiki_id}, '${item.title.replace(/'/g, "\\'")}', '${item.trans_id || ''}')">
-                    <img src="https://shikimori.one/system/animes/original/${item.shiki_id}.jpg" loading="lazy">
+                    <img src="https://shikimori.one/system/animes/original/${item.shiki_id}.jpg" data-attempt="0" onerror="handleImgFallback(this, ${item.shiki_id})" loading="lazy">
                     <div class="info"><div class="title">${item.title}</div></div>
                 </div>
             `;
@@ -400,7 +419,7 @@
                 html += `
                     <div class="card" onclick="openAnimeData(${sid}, '${g.title.replace(/'/g, "\\'")}', '${encodeURIComponent(JSON.stringify(g.items))}')">
                         ${badge}
-                        <img src="https://shikimori.one/system/animes/original/${sid}.jpg" loading="lazy">
+                        <img src="https://shikimori.one/system/animes/original/${sid}.jpg" data-attempt="0" onerror="handleImgFallback(this, ${sid})" loading="lazy">
                         <div class="info">
                             <div class="title">${g.title}</div>
                             <div class="year">${g.year || '?'}</div>
@@ -417,7 +436,12 @@
         document.getElementById('modal-title-top').textContent = title;
         document.getElementById('m-title').textContent = title;
         document.getElementById('m-desc').textContent = "Загрузка...";
-        document.getElementById('m-cover').src = `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
+        
+        let mCover = document.getElementById('m-cover');
+        mCover.dataset.attempt = "0";
+        mCover.onerror = function() { handleImgFallback(this, shiki_id); };
+        mCover.src = `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
+        
         document.getElementById('m-eps').innerHTML = '<div class="loader">Загрузка серий...</div>';
         document.getElementById('m-trans').innerHTML = '';
         
@@ -440,7 +464,12 @@
         document.getElementById('m-title').textContent = title;
         document.getElementById('modal-title-top').textContent = title;
         document.getElementById('m-desc').textContent = "Загрузка описания...";
-        document.getElementById('m-cover').src = `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
+        
+        let mCover = document.getElementById('m-cover');
+        mCover.dataset.attempt = "0";
+        mCover.onerror = function() { handleImgFallback(this, shiki_id); };
+        mCover.src = `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
+        
         document.getElementById('modal').classList.add('active');
         stopPlayer();
         
