@@ -254,11 +254,7 @@
         let attempt = parseInt(img.dataset.attempt || "0");
         const urls = [
             `https://shikimori.one/system/animes/original/${id}.jpg`,
-            `https://shikimori.one/system/animes/original/${id}.jpeg`,
-            `https://shikimori.one/system/animes/original/${id}.png`,
-            `https://shikimori.io/uploads/poster/animes/${id}.jpg`,
-            `https://shikimori.io/system/animes/original/${id}.jpeg`,
-            `https://shikimori.io/system/animes/original/${id}.png`
+            `https://shikimori.io/uploads/poster/animes/${id}.jpg`
         ];
         attempt++;
         if (attempt < urls.length) {
