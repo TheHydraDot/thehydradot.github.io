@@ -241,7 +241,7 @@
     let statusData = {};
     let syncTimer = null;
     let pollerInterval = null;
-    let isDirty = false;  // true when local changes haven't been pushed yet
+    let isDirty = false;
 
     let currentAnime = null;
     let currentResults = null;
@@ -249,19 +249,18 @@
 
     const CAT_LABELS = { "watching": "Смотрю", "planned": "В планах", "on_hold": "Отложено", "dropped": "Брошено", "completed": "Просмотрено" };
 
-    // Функция перебора доменов и расширений для обложек
     function handleImgFallback(img, id) {
         let attempt = parseInt(img.dataset.attempt || "0");
         const urls = [
             `https://shikimori.one/system/animes/original/${id}.jpg`,
-            `https://shikimori.io/uploads/poster/animes/${id}.jpg`
+            `https://shikimori.io/system/animes/original/${id}.jpg`
         ];
         attempt++;
         if (attempt < urls.length) {
             img.dataset.attempt = attempt;
             img.src = urls[attempt];
         } else {
-            img.onerror = null; // Отключаем, чтобы избежать бесконечного цикла
+            img.onerror = null;
         }
     }
 
@@ -375,9 +374,11 @@
         
         let html = '';
         for (let item of items) {
+            // Используем сохраненный постер, если есть, иначе фоллбэк
+            let posterSrc = item.poster || `https://shikimori.one/system/animes/original/${item.shiki_id}.jpg`;
             html += `
                 <div class="card" onclick="openAnime(${item.shiki_id}, '${item.title.replace(/'/g, "\\'")}', '${item.trans_id || ''}')">
-                    <img src="https://shikimori.one/system/animes/original/${item.shiki_id}.jpg" data-attempt="0" onerror="handleImgFallback(this, ${item.shiki_id})" loading="lazy">
+                    <img src="${posterSrc}" data-attempt="0" onerror="handleImgFallback(this, ${item.shiki_id})" loading="lazy">
                     <div class="info"><div class="title">${item.title}</div></div>
                 </div>
             `;
@@ -404,7 +405,14 @@
             let groups = {};
             for (let r of data.results) {
                 if (!r.shikimori_id) continue;
-                if (!groups[r.shikimori_id]) groups[r.shikimori_id] = { title: r.title, year: r.year, items: [] };
+                // Пробуем взять постер из ответа Kodik, если он там есть
+                let posterUrl = (r.material_data && r.material_data.poster_url) ? r.material_data.poster_url : null;
+                
+                if (!groups[r.shikimori_id]) {
+                    groups[r.shikimori_id] = { title: r.title, year: r.year, poster: posterUrl, items: [] };
+                } else if (!groups[r.shikimori_id].poster && posterUrl) {
+                    groups[r.shikimori_id].poster = posterUrl;
+                }
                 groups[r.shikimori_id].items.push(r);
             }
             
@@ -412,10 +420,12 @@
             for (let sid in groups) {
                 let g = groups[sid];
                 let badge = listsData[sid] ? `<div class="badge">${CAT_LABELS[listsData[sid].status] || listsData[sid].status}</div>` : '';
+                let posterSrc = g.poster || (listsData[sid] ? listsData[sid].poster : `https://shikimori.one/system/animes/original/${sid}.jpg`);
+                
                 html += `
                     <div class="card" onclick="openAnimeData(${sid}, '${g.title.replace(/'/g, "\\'")}', '${encodeURIComponent(JSON.stringify(g.items))}')">
                         ${badge}
-                        <img src="https://shikimori.one/system/animes/original/${sid}.jpg" data-attempt="0" onerror="handleImgFallback(this, ${sid})" loading="lazy">
+                        <img src="${posterSrc}" data-attempt="0" onerror="handleImgFallback(this, ${sid})" loading="lazy">
                         <div class="info">
                             <div class="title">${g.title}</div>
                             <div class="year">${g.year || '?'}</div>
@@ -433,10 +443,11 @@
         document.getElementById('m-title').textContent = title;
         document.getElementById('m-desc').textContent = "Загрузка...";
         
+        let savedPoster = listsData[shiki_id] ? listsData[shiki_id].poster : null;
         let mCover = document.getElementById('m-cover');
         mCover.dataset.attempt = "0";
         mCover.onerror = function() { handleImgFallback(this, shiki_id); };
-        mCover.src = `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
+        mCover.src = savedPoster || `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
         
         document.getElementById('m-eps').innerHTML = '<div class="loader">Загрузка серий...</div>';
         document.getElementById('m-trans').innerHTML = '';
@@ -454,26 +465,34 @@
     }
 
     function openAnimeData(shiki_id, title, itemsJsonUrl, preferred_trans_id) {
-        currentAnime = { shiki_id, title };
+        currentAnime = { shiki_id, title, poster: listsData[shiki_id] ? listsData[shiki_id].poster : null };
         currentResults = JSON.parse(decodeURIComponent(itemsJsonUrl));
         
         document.getElementById('m-title').textContent = title;
         document.getElementById('modal-title-top').textContent = title;
         document.getElementById('m-desc').textContent = "Загрузка описания...";
-        
-        let mCover = document.getElementById('m-cover');
-        mCover.dataset.attempt = "0";
-        mCover.onerror = function() { handleImgFallback(this, shiki_id); };
-        mCover.src = `https://shikimori.one/system/animes/original/${shiki_id}.jpg`;
-        
         document.getElementById('modal').classList.add('active');
         stopPlayer();
         
+        // Запрос к API Шикимори для получения описания и ТОЧНОЙ ссылки на обложку
         fetch(`https://shikimori.one/api/animes/${shiki_id}`)
             .then(r => r.json())
             .then(shiki => {
                 if (shiki && shiki.description) document.getElementById('m-desc').textContent = shiki.description.replace(/\[.*?\]/g, '');
                 else document.getElementById('m-desc').textContent = "Описание отсутствует.";
+                
+                // Достаем актуальную ссылку на обложку (с хешем)
+                if (shiki && shiki.image && shiki.image.original) {
+                    let imgUrl = `https://shikimori.one${shiki.image.original}`;
+                    document.getElementById('m-cover').src = imgUrl;
+                    currentAnime.poster = imgUrl; // Сохраняем в память, чтобы потом записать в списки
+                    
+                    // Если аниме уже есть в списке, немедленно обновляем обложку в базе
+                    if (listsData[shiki_id] && listsData[shiki_id].poster !== imgUrl) {
+                        listsData[shiki_id].poster = imgUrl;
+                        pushData();
+                    }
+                }
             }).catch(()=> document.getElementById('m-desc').textContent = "");
         
         updateStatusButtons();
@@ -516,10 +535,17 @@
         
         if (status === '') {
             delete listsData[currentAnime.shiki_id];
-            // Hack to force delete empty status
             listsData[currentAnime.shiki_id] = {status: ''}; 
         } else {
-            listsData[currentAnime.shiki_id] = {status: status, title: currentAnime.title, trans_id: trans_id, shiki_id: currentAnime.shiki_id, trans_title: selectedT};
+            // Сохраняем также постер, чтобы при открытии списка он сразу был с правильным хешем
+            listsData[currentAnime.shiki_id] = {
+                status: status, 
+                title: currentAnime.title, 
+                trans_id: trans_id, 
+                shiki_id: currentAnime.shiki_id, 
+                trans_title: selectedT,
+                poster: currentAnime.poster
+            };
         }
         pushData();
         updateStatusButtons();
@@ -601,7 +627,6 @@
         let url = link;
         if(url.startsWith('//')) url = 'https:' + url;
         
-        // Добавляем параметры качества 720p (если плеер поддерживает)
         let separator = url.includes('?') ? '&' : '?';
         url += `${separator}quality=720&vq=720`;
         
